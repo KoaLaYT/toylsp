@@ -1,0 +1,7 @@
+linters:
+  disabled-all: true
+  enable:
+    - goimports
+    - govet
+    - staticcheck
+    - revive
