@@ -2,15 +2,33 @@ package rpc
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
+
+	"github.com/KoaLaYT/toylsp/internal/lsp"
 )
 
 const HeaderContentLength = "Content-Length: "
 
 func errMalformedHeader(header []byte, msg string) error {
-	return fmt.Errorf("Malformed header, %s: %s", msg, string(header))
+	return fmt.Errorf("malformed header, %s: %s", msg, string(header))
+}
+
+func Decode(data []byte) (string, []byte, error) {
+	var req lsp.BaseMessage
+	if err := json.Unmarshal(data, &req); err != nil {
+		return "", nil, fmt.Errorf("decode message: %w", err)
+	}
+	return req.Method, data, nil
+}
+
+func Encode(data []byte) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data)))
+	buf.Write(data)
+	return buf.Bytes()
 }
 
 func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -35,6 +53,7 @@ func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	totalLength := len(header) + 4 + len(content)
 	return totalLength, data[len(header)+4 : totalLength], nil
 }
+
 func getContentLength(header []byte) (int, error) {
 	conetentLengthIndex := bytes.Index(header, []byte(HeaderContentLength))
 	if conetentLengthIndex == -1 {
