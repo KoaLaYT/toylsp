@@ -3,6 +3,7 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 )
 
@@ -30,6 +31,48 @@ func (s *State) GetFile(file string) string {
 		return ""
 	}
 	return content
+}
+
+func (s *State) PublishDiagnostic() ([]byte, error) {
+	if len(s.Files) <= 0 {
+		return nil, fmt.Errorf("cannot publish diagnostics: empty files")
+	}
+
+	var uri string
+	for file := range s.Files {
+		uri = file
+		break
+	}
+
+	diagnostics := []Diagnostics{}
+	if rand.IntN(10) < 5 {
+		diagnostics = append(diagnostics, Diagnostics{
+			Range: Range{
+				Start: Position{
+					Line:      0,
+					Character: 0,
+				},
+				End: Position{
+					Line:      1,
+					Character: 2,
+				},
+			},
+			Severity: DiagnosticSeverityError,
+			Source:   "ToyLinter",
+			Message:  "This will make kids cry!",
+		})
+	}
+	notify := PublishDiagnosticNotification{
+		Notification: Notification{
+			RPC:    "2.0",
+			Method: PublishDiagnosticMethod,
+		},
+		Params: PublishDiagnosticsParams{
+			URI:         uri,
+			Diagnostics: diagnostics,
+		},
+	}
+	return json.Marshal(notify)
 }
 
 // TODO: we are now just generating garbages
@@ -78,7 +121,7 @@ func (s *State) ResolveHover(id int, file string, pos Position) ([]byte, error) 
 	// Just return some nonesense
 	// and with whole line as range
 	lines := strings.Split(content, "\n")
-	if pos.Line >= uint(len(lines)) || pos.Character >= uint(len(lines[pos.Line])) {
+	if pos.Line > uint(len(lines)) || pos.Character > uint(len(lines[pos.Line])) {
 		return nil, fmt.Errorf("ResolveHover position out of range")
 	}
 

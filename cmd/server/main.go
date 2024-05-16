@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/KoaLaYT/toylsp/internal/lsp"
 	"github.com/KoaLaYT/toylsp/internal/rpc"
@@ -12,23 +13,33 @@ import (
 
 func main() {
 	s := newServer()
+	reqChan := s.startReceiveRequest()
+	tick := time.NewTicker(5 * time.Second)
 
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(rpc.Split)
-
-	for scanner.Scan() {
-		raw := scanner.Bytes()
-		method, msg, err := rpc.Decode(raw)
-		if err != nil {
-			s.log.Fatal(err)
+	for {
+		select {
+		case r := <-reqChan:
+			s.handleMsg(r.method, r.msg)
+		case <-tick.C:
+			resp, err := s.state.PublishDiagnostic()
+			if err != nil {
+				s.log.Println(err)
+				continue
+			}
+			s.log.Printf("send %s: %s\n", lsp.PublishDiagnosticMethod, string(resp))
+			s.reply(resp)
 		}
-		s.handleMsg(method, msg)
 	}
 }
 
 type server struct {
 	log   *log.Logger
 	state *lsp.State
+}
+
+type rawRequest struct {
+	method string
+	msg    []byte
 }
 
 func newServer() *server {
@@ -39,6 +50,26 @@ func newServer() *server {
 
 	s.log.Println("started")
 	return s
+}
+
+func (s *server) startReceiveRequest() <-chan rawRequest {
+	out := make(chan rawRequest)
+
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Split(rpc.Split)
+
+		for scanner.Scan() {
+			raw := scanner.Bytes()
+			method, msg, err := rpc.Decode(raw)
+			if err != nil {
+				s.log.Fatal(err)
+			}
+			out <- rawRequest{method, msg}
+		}
+	}()
+
+	return out
 }
 
 func (s *server) fatalOn(err error) {

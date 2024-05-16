@@ -6,6 +6,7 @@ const (
 	DidOpenTextDocumentMethod   = "textDocument/didOpen"
 	HoverMethod                 = "textDocument/hover"
 	CompletionMethod            = "textDocument/completion"
+	PublishDiagnosticMethod     = "textDocument/publishDiagnostics"
 )
 
 type BaseMessage struct {
